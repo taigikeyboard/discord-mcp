@@ -4,19 +4,17 @@ Minimal MCP server for Discord forum and text channels.
 
 ## Setup
 
-Bot needs `View Channels`, `Read Message History`, `Send Messages in Threads`, `Create Public Threads`, `Manage Threads`.
+1. [Discord Developer Portal](https://discord.com/developers/applications) → Bot → copy token; enable **Message Content Intent** (required to read message text).
+2. OAuth2 → URL Generator → scope `bot`; permissions: View Channels, Read Message History, Send Messages, Send Messages in Threads, Create Public Threads, Manage Threads. Open the URL to invite.
+3. Register:
 
-```json
-{
-  "mcpServers": {
-    "discord": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/discord-mcp", "run", "discord-mcp"],
-      "env": { "DISCORD_BOT_TOKEN": "..." }
-    }
-  }
-}
+```sh
+claude mcp add discord -e DISCORD_BOT_TOKEN=... -- uv --directory /path/to/discord-mcp run discord-mcp
 ```
+
+Any MCP client works with the equivalent `command` / `args` / `env`.
+
+Channel IDs: Discord → Settings → Advanced → Developer Mode → right-click channel → Copy ID.
 
 ## Tools
 
@@ -26,13 +24,16 @@ Bot needs `View Channels`, `Read Message History`, `Send Messages in Threads`, `
 | `list_posts` | `forum_id`, `include_archived=false`, `limit=50` |
 | `read_post` | `thread_id`, `limit=50` |
 | `read_channel` | `channel_id`, `limit=50` |
-| `create_post` | `forum_id`, `title`, `content`, `tags=[]` (names or IDs) |
-| `set_tags` | `thread_id`, `tags` (names or IDs) |
+| `create_post` | `forum_id`, `title`, `content`, `tags=[]` |
+| `reply_post` | `thread_id`, `content` |
+| `set_tags` / `add_tags` / `remove_tags` | `thread_id`, `tags` |
 | `close_post` | `thread_id`, `lock=false` |
+
+`tags` accept names or IDs.
 
 ## Dev
 
 ```sh
 uv sync --all-groups
-uv run ruff format . && uv run ruff check . && uv run ty check src/
+uv run ruff format . && uv run ruff check . && uv run ty check src/ && uv run pytest
 ```
