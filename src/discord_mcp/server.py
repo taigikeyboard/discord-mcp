@@ -6,6 +6,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 API = "https://discord.com/api/v10"
+PAGE = 100
 mcp = MCPServer("discord")
 
 
@@ -26,18 +27,32 @@ def _channel(channel_id: str) -> dict:
     return _req("GET", f"/channels/{channel_id}")
 
 
+def _message(m: dict) -> dict:
+    return {
+        "id": m["id"],
+        "author": m["author"]["username"],
+        "content": m["content"],
+        "timestamp": m["timestamp"],
+        "attachments": [a["url"] for a in m.get("attachments", [])],
+    }
+
+
 def _messages(channel_id: str, limit: int) -> list[dict]:
-    messages = _req("GET", f"/channels/{channel_id}/messages", params={"limit": min(limit, 100)})
-    return [
-        {
-            "id": m["id"],
-            "author": m["author"]["username"],
-            "content": m["content"],
-            "timestamp": m["timestamp"],
-            "attachments": [a["url"] for a in m.get("attachments", [])],
-        }
-        for m in reversed(messages)
-    ]
+    path = f"/channels/{channel_id}/messages"
+    return [_message(m) for m in reversed(_req("GET", path, params={"limit": min(limit, PAGE)}))]
+
+
+def _archived(forum_id: str, limit: int) -> list[dict]:
+    threads: list[dict] = []
+    before = None
+    while len(threads) < limit:
+        params = {"limit": min(limit - len(threads), PAGE), "before": before}
+        page = _req("GET", f"/channels/{forum_id}/threads/archived/public", params=params)
+        threads += page["threads"]
+        if not page["has_more"]:
+            break
+        before = threads[-1]["thread_metadata"]["archive_timestamp"]
+    return threads
 
 
 def _tags(forum: dict) -> dict[str, str]:
@@ -70,6 +85,22 @@ def _post(thread: dict, tags: dict[str, str]) -> dict:
     }
 
 
+def _update_tags(thread_id: str, tags: list[str], mode: str) -> dict:
+    thread = _channel(thread_id)
+    forum = _channel(thread["parent_id"])
+    ids = _resolve_tags(forum, tags)
+    current = thread.get("applied_tags", [])
+    match mode:
+        case "add":
+            applied = current + [i for i in ids if i not in current]
+        case "remove":
+            applied = [i for i in current if i not in ids]
+        case _:
+            applied = ids
+    body = {"applied_tags": applied}
+    return _post(_req("PATCH", f"/channels/{thread_id}", json=body), _tags(forum))
+
+
 @mcp.tool()
 def list_tags(forum_id: str) -> list[dict]:
     """List available tags of a forum channel."""
@@ -82,9 +113,8 @@ def list_posts(forum_id: str, include_archived: bool = False, limit: int = 50) -
     forum = _channel(forum_id)
     active = _req("GET", f"/guilds/{forum['guild_id']}/threads/active")["threads"]
     threads = [t for t in active if t["parent_id"] == forum_id]
-    if include_archived:
-        path = f"/channels/{forum_id}/threads/archived/public"
-        threads += _req("GET", path, params={"limit": limit})["threads"]
+    if include_archived and len(threads) < limit:
+        threads += _archived(forum_id, limit - len(threads))
     return [_post(t, _tags(forum)) for t in threads[:limit]]
 
 
@@ -115,11 +145,27 @@ def create_post(forum_id: str, title: str, content: str, tags: list[str] | None 
 
 
 @mcp.tool()
+def reply_post(thread_id: str, content: str) -> dict:
+    """Send a message in a forum post or thread."""
+    return _message(_req("POST", f"/channels/{thread_id}/messages", json={"content": content}))
+
+
+@mcp.tool()
 def set_tags(thread_id: str, tags: list[str]) -> dict:
     """Replace tags on a forum post. `tags` are tag names or IDs."""
-    forum = _channel(_channel(thread_id)["parent_id"])
-    body = {"applied_tags": _resolve_tags(forum, tags)}
-    return _post(_req("PATCH", f"/channels/{thread_id}", json=body), _tags(forum))
+    return _update_tags(thread_id, tags, "set")
+
+
+@mcp.tool()
+def add_tags(thread_id: str, tags: list[str]) -> dict:
+    """Add tags to a forum post. `tags` are tag names or IDs."""
+    return _update_tags(thread_id, tags, "add")
+
+
+@mcp.tool()
+def remove_tags(thread_id: str, tags: list[str]) -> dict:
+    """Remove tags from a forum post. `tags` are tag names or IDs."""
+    return _update_tags(thread_id, tags, "remove")
 
 
 @mcp.tool()

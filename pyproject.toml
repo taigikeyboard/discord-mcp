@@ -20,8 +20,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.8",
-    "ty>=0.0.81",
+    "pytest==9.1.1",
+    "respx==0.23.1",
+    "ruff==0.16.8",
+    "ty==0.0.81",
 ]
 
 [tool.ruff]
@@ -34,3 +36,6 @@ ignore = ["D", "COM812", "ISC001", "ANN401", "CPY", "EM", "TRY003", "FBT", "PLR2
 
 [tool.ty.environment]
 python-version = "3.13"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "E501", "INP001", "ANN", "ARG001"]
