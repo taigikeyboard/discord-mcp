@@ -1,0 +1,36 @@
+[project]
+name = "discord-mcp"
+version = "0.1.0"
+description = "Minimal MCP server for Discord forum and text channels"
+authors = [
+    { name = "siansiansu", email = "minsiansu@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "httpx==0.28.1",
+    "mcp==2.2.0",
+]
+
+[project.scripts]
+discord-mcp = "discord_mcp.server:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.8",
+    "ty>=0.0.81",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D", "COM812", "ISC001", "ANN401", "CPY", "EM", "TRY003", "FBT", "PLR2004"]
+
+[tool.ty.environment]
+python-version = "3.13"
