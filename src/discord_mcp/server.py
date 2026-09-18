@@ -43,11 +43,20 @@ def _message(m: dict, guild_id: str | None = None) -> dict:
 
 
 def _messages(
-    channel_id: str, limit: int, before: str | None = None, guild_id: str | None = None
+    channel_id: str,
+    limit: int,
+    before: str | None = None,
+    guild_id: str | None = None,
+    after: str | None = None,
 ) -> list[dict]:
     path = f"/channels/{channel_id}/messages"
-    params = {"limit": min(limit, PAGE), **({"before": before} if before else {})}
-    return [_message(m, guild_id) for m in reversed(_req("GET", path, params=params))]
+    params = {"limit": min(limit, PAGE)}
+    if before:
+        params["before"] = before
+    if after:
+        params["after"] = after
+    page = sorted(_req("GET", path, params=params), key=lambda m: int(m["id"]))
+    return [_message(m, guild_id) for m in page]
 
 
 def _archived(forum_id: str, limit: int) -> list[dict]:
@@ -140,14 +149,17 @@ def read_post(thread_id: str, limit: int = 50) -> dict:
 
 
 @mcp.tool()
-def read_channel(channel_id: str, limit: int = 50, before: str | None = None) -> list[dict]:
+def read_channel(
+    channel_id: str, limit: int = 50, before: str | None = None, after: str | None = None
+) -> list[dict]:
     """Read recent messages from a text channel, oldest first.
 
-    `before` is a message ID: page backwards from it. Each message carries a `link`
-    and, when it is a reply, the `reply_to` message ID.
+    `before` is a message ID: page backwards from it. `after` is a message ID: return
+    only messages newer than it (oldest first). Each message carries a `link` and,
+    when it is a reply, the `reply_to` message ID.
     """
     guild_id = _channel(channel_id)["guild_id"]
-    return _messages(channel_id, limit, before, guild_id)
+    return _messages(channel_id, limit, before, guild_id, after)
 
 
 @mcp.tool()

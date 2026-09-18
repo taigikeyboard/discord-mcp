@@ -19,7 +19,7 @@ THREAD = {
     "message_count": 2,
 }
 MSG = {
-    "id": "m1",
+    "id": "101",
     "channel_id": "c1",
     "author": {"username": "alice"},
     "content": "hi",
@@ -59,9 +59,17 @@ def test_list_tags(api):
 
 
 def test_read_channel_oldest_first(api):
-    api.get("/channels/c1/messages").respond(json=[{**MSG, "id": "m2"}, MSG])
+    api.get("/channels/c1/messages").respond(json=[{**MSG, "id": "102"}, MSG])
     ids = [m["id"] for m in server.read_channel("c1")]
-    assert ids == ["m1", "m2"]
+    assert ids == ["101", "102"]
+
+
+def test_read_channel_after(api):
+    route = api.get("/channels/c1/messages").respond(json=[MSG, {**MSG, "id": "102"}])
+    ids = [m["id"] for m in server.read_channel("c1", after="m0")]
+    assert route.calls.last.request.url.params["after"] == "m0"
+    assert "before" not in route.calls.last.request.url.params
+    assert ids == ["101", "102"]
 
 
 def test_read_channel_link_reply_and_before(api):
@@ -76,7 +84,7 @@ def test_read_channel_link_reply_and_before(api):
     )
     m = server.read_channel("c1", before="m9")[0]
     assert route.calls.last.request.url.params["before"] == "m9"
-    assert m["link"] == "https://discord.com/channels/g1/c1/m1"
+    assert m["link"] == "https://discord.com/channels/g1/c1/101"
     assert m["reply_to"] == "m0"
     assert m["bot"] is True
 
