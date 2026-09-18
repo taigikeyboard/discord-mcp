@@ -174,3 +174,18 @@ def test_close_post_locks(api):
     )
     assert server.close_post("p1", lock=True)["locked"] is True
     assert route.calls.last.request.content == b'{"archived":true,"locked":true}'
+
+
+def test_add_tags_on_archived_post_reopens_then_recloses(api):
+    archived = {**THREAD, "thread_metadata": {"archived": True, "locked": False}}
+    api.get("/channels/p1").respond(json=archived)
+    route = api.patch("/channels/p1").respond(json=archived)
+    server.add_tags("p1", ["done"])
+    assert route.calls[0].request.content == b'{"applied_tags":["t1","t2"],"archived":false}'
+    assert route.calls[1].request.content == b'{"archived":true}'
+
+
+def test_reopen_post(api):
+    route = api.patch("/channels/p1").respond(json=THREAD)
+    assert server.reopen_post("p1")["archived"] is False
+    assert route.calls.last.request.content == b'{"archived":false,"locked":false}'
