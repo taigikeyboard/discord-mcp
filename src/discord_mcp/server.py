@@ -54,7 +54,10 @@ def _archived(forum_id: str, limit: int) -> list[dict]:
     threads: list[dict] = []
     before = None
     while len(threads) < limit:
-        params = {"limit": min(limit - len(threads), PAGE), **({"before": before} if before else {})}
+        params = {
+            "limit": min(limit - len(threads), PAGE),
+            **({"before": before} if before else {}),
+        }
         page = _req("GET", f"/channels/{forum_id}/threads/archived/public", params=params)
         threads += page["threads"]
         if not page["has_more"]:
