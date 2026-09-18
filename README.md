@@ -23,9 +23,9 @@ Channel IDs: Discord → Settings → Advanced → Developer Mode → right-clic
 | `list_tags` | `forum_id` |
 | `list_posts` | `forum_id`, `include_archived=false`, `limit=50` |
 | `read_post` | `thread_id`, `limit=50` |
-| `read_channel` | `channel_id`, `limit=50` |
+| `read_channel` | `channel_id`, `limit=50`, `before` (message ID, page backwards); each message has `link`, `reply_to`, `bot` |
 | `create_post` | `forum_id`, `title`, `content`, `tags=[]` |
-| `reply_post` | `thread_id`, `content` |
+| `reply_post` | `thread_id`, `content`, `reply_to` (message ID → Discord reply) |
 | `set_tags` / `add_tags` / `remove_tags` | `thread_id`, `tags` |
 | `close_post` | `thread_id`, `lock=false` |
 
