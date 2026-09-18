@@ -46,7 +46,7 @@ def _messages(
     channel_id: str, limit: int, before: str | None = None, guild_id: str | None = None
 ) -> list[dict]:
     path = f"/channels/{channel_id}/messages"
-    params = {"limit": min(limit, PAGE), "before": before}
+    params = {"limit": min(limit, PAGE), **({"before": before} if before else {})}
     return [_message(m, guild_id) for m in reversed(_req("GET", path, params=params))]
 
 
@@ -54,7 +54,10 @@ def _archived(forum_id: str, limit: int) -> list[dict]:
     threads: list[dict] = []
     before = None
     while len(threads) < limit:
-        params = {"limit": min(limit - len(threads), PAGE), "before": before}
+        params = {
+            "limit": min(limit - len(threads), PAGE),
+            **({"before": before} if before else {}),
+        }
         page = _req("GET", f"/channels/{forum_id}/threads/archived/public", params=params)
         threads += page["threads"]
         if not page["has_more"]:
