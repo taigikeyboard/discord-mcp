@@ -20,6 +20,7 @@ THREAD = {
 }
 MSG = {
     "id": "m1",
+    "channel_id": "c1",
     "author": {"username": "alice"},
     "content": "hi",
     "timestamp": "2026-01-01T00:00:00Z",
@@ -36,7 +37,8 @@ def token(monkeypatch):
 def api():
     with respx.mock(base_url=server.API, assert_all_called=False) as mock:
         mock.get("/channels/f1").respond(json=FORUM)
-        mock.get("/channels/p1").respond(json=THREAD)
+        mock.get("/channels/p1").respond(json={**THREAD, "guild_id": "g1"})
+        mock.get("/channels/c1").respond(json={"id": "c1", "guild_id": "g1"})
         yield mock
 
 
@@ -47,7 +49,7 @@ def test_missing_token_raises(monkeypatch):
 
 
 def test_http_error_surfaces_status(api):
-    api.get("/channels/bad/messages").respond(404, text="nope")
+    api.get("/channels/bad").respond(404, text="nope")
     with pytest.raises(ToolError, match="Discord 404: nope"):
         server.read_channel("bad")
 
@@ -60,6 +62,23 @@ def test_read_channel_oldest_first(api):
     api.get("/channels/c1/messages").respond(json=[{**MSG, "id": "m2"}, MSG])
     ids = [m["id"] for m in server.read_channel("c1")]
     assert ids == ["m1", "m2"]
+
+
+def test_read_channel_link_reply_and_before(api):
+    route = api.get("/channels/c1/messages").respond(
+        json=[
+            {
+                **MSG,
+                "message_reference": {"message_id": "m0"},
+                "author": {"username": "b", "bot": True},
+            }
+        ]
+    )
+    m = server.read_channel("c1", before="m9")[0]
+    assert route.calls.last.request.url.params["before"] == "m9"
+    assert m["link"] == "https://discord.com/channels/g1/c1/m1"
+    assert m["reply_to"] == "m0"
+    assert m["bot"] is True
 
 
 def test_read_post_resolves_tag_names(api):
@@ -130,6 +149,15 @@ def test_reply_post(api):
     route = api.post("/channels/p1/messages").respond(json=MSG)
     assert server.reply_post("p1", "hi")["author"] == "alice"
     assert route.calls.last.request.content == b'{"content":"hi"}'
+
+
+def test_reply_post_reply_to(api):
+    route = api.post("/channels/c1/messages").respond(json=MSG)
+    server.reply_post("c1", "hi", reply_to="m0")
+    assert (
+        route.calls.last.request.content
+        == b'{"content":"hi","message_reference":{"message_id":"m0"}}'
+    )
 
 
 def test_close_post_locks(api):
