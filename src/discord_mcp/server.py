@@ -27,19 +27,27 @@ def _channel(channel_id: str) -> dict:
     return _req("GET", f"/channels/{channel_id}")
 
 
-def _message(m: dict) -> dict:
+def _message(m: dict, guild_id: str | None = None) -> dict:
     return {
         "id": m["id"],
         "author": m["author"]["username"],
+        "bot": m["author"].get("bot", False),
         "content": m["content"],
         "timestamp": m["timestamp"],
         "attachments": [a["url"] for a in m.get("attachments", [])],
+        "reply_to": (m.get("message_reference") or {}).get("message_id"),
+        "link": f"https://discord.com/channels/{guild_id}/{m['channel_id']}/{m['id']}"
+        if guild_id
+        else None,
     }
 
 
-def _messages(channel_id: str, limit: int) -> list[dict]:
+def _messages(
+    channel_id: str, limit: int, before: str | None = None, guild_id: str | None = None
+) -> list[dict]:
     path = f"/channels/{channel_id}/messages"
-    return [_message(m) for m in reversed(_req("GET", path, params={"limit": min(limit, PAGE)}))]
+    params = {"limit": min(limit, PAGE), "before": before}
+    return [_message(m, guild_id) for m in reversed(_req("GET", path, params=params))]
 
 
 def _archived(forum_id: str, limit: int) -> list[dict]:
@@ -124,14 +132,19 @@ def read_post(thread_id: str, limit: int = 50) -> dict:
     thread = _channel(thread_id)
     return {
         **_post(thread, _tags(_channel(thread["parent_id"]))),
-        "messages": _messages(thread_id, limit),
+        "messages": _messages(thread_id, limit, guild_id=thread["guild_id"]),
     }
 
 
 @mcp.tool()
-def read_channel(channel_id: str, limit: int = 50) -> list[dict]:
-    """Read recent messages from a text channel, oldest first."""
-    return _messages(channel_id, limit)
+def read_channel(channel_id: str, limit: int = 50, before: str | None = None) -> list[dict]:
+    """Read recent messages from a text channel, oldest first.
+
+    `before` is a message ID: page backwards from it. Each message carries a `link`
+    and, when it is a reply, the `reply_to` message ID.
+    """
+    guild_id = _channel(channel_id)["guild_id"]
+    return _messages(channel_id, limit, before, guild_id)
 
 
 @mcp.tool()
@@ -145,9 +158,15 @@ def create_post(forum_id: str, title: str, content: str, tags: list[str] | None 
 
 
 @mcp.tool()
-def reply_post(thread_id: str, content: str) -> dict:
-    """Send a message in a forum post or thread."""
-    return _message(_req("POST", f"/channels/{thread_id}/messages", json={"content": content}))
+def reply_post(thread_id: str, content: str, reply_to: str | None = None) -> dict:
+    """Send a message in a forum post, thread or text channel.
+
+    `reply_to` is a message ID in that channel: the message is sent as a reply to it.
+    """
+    body: dict[str, Any] = {"content": content}
+    if reply_to:
+        body["message_reference"] = {"message_id": reply_to}
+    return _message(_req("POST", f"/channels/{thread_id}/messages", json=body))
 
 
 @mcp.tool()
