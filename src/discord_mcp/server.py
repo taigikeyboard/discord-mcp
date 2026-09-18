@@ -117,8 +117,16 @@ def _update_tags(thread_id: str, tags: list[str], mode: str) -> dict:
             applied = [i for i in current if i not in ids]
         case _:
             applied = ids
-    body = {"applied_tags": applied}
-    return _post(_req("PATCH", f"/channels/{thread_id}", json=body), _tags(forum))
+    body: dict[str, Any] = {"applied_tags": applied}
+    if thread.get("thread_metadata", {}).get("archived"):
+        # Discord rejects tag edits on an archived thread (50083); unarchive in the
+        # same PATCH, then archive again so the post stays closed.
+        body["archived"] = False
+        _req("PATCH", f"/channels/{thread_id}", json=body)
+        thread = _req("PATCH", f"/channels/{thread_id}", json={"archived": True})
+    else:
+        thread = _req("PATCH", f"/channels/{thread_id}", json=body)
+    return _post(thread, _tags(forum))
 
 
 @mcp.tool()
@@ -206,6 +214,13 @@ def remove_tags(thread_id: str, tags: list[str]) -> dict:
 def close_post(thread_id: str, lock: bool = False) -> dict:
     """Archive a forum post. `lock=True` also prevents reopening."""
     thread = _req("PATCH", f"/channels/{thread_id}", json={"archived": True, "locked": lock})
+    return _post(thread, _tags(_channel(thread["parent_id"])))
+
+
+@mcp.tool()
+def reopen_post(thread_id: str) -> dict:
+    """Unarchive (and unlock) a forum post."""
+    thread = _req("PATCH", f"/channels/{thread_id}", json={"archived": False, "locked": False})
     return _post(thread, _tags(_channel(thread["parent_id"])))
 
 
