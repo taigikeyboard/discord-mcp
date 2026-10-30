@@ -1,4 +1,6 @@
 import os
+import time
+from http import HTTPStatus
 from typing import Any
 
 import httpx
@@ -7,6 +9,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 API = "https://discord.com/api/v10"
 PAGE = 100
+RATE_LIMIT_RETRIES = 5
 mcp = MCPServer("discord")
 
 
@@ -18,6 +21,11 @@ def _req(method: str, path: str, **kwargs: Any) -> Any:
         base_url=API, headers={"Authorization": f"Bot {token}"}, timeout=30
     ) as client:
         response = client.request(method, path, **kwargs)
+        for _ in range(RATE_LIMIT_RETRIES):
+            if response.status_code != HTTPStatus.TOO_MANY_REQUESTS:
+                break
+            time.sleep(float(response.headers.get("retry-after", 1)))
+            response = client.request(method, path, **kwargs)
     if response.is_error:
         raise ToolError(f"Discord {response.status_code}: {response.text}")
     return response.json() if response.content else None

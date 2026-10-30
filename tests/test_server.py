@@ -189,3 +189,12 @@ def test_reopen_post(api):
     route = api.patch("/channels/p1").respond(json=THREAD)
     assert server.reopen_post("p1")["archived"] is False
     assert route.calls.last.request.content == b'{"archived":false,"locked":false}'
+
+
+def test_rate_limit_retries(api, monkeypatch):
+    monkeypatch.setattr(server.time, "sleep", lambda _: None)
+    route = api.get("/channels/c1/messages").mock(
+        side_effect=[Response(429, headers={"retry-after": "0.1"}), Response(200, json=[])]
+    )
+    assert server.read_channel("c1") == []
+    assert route.call_count == 2

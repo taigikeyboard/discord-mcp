@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 discord-mcp = "discord_mcp.server:main"
+discord-sync = "discord_mcp.sync:main"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
@@ -38,4 +39,6 @@ ignore = ["D", "COM812", "ISC001", "ANN401", "CPY", "EM", "TRY003", "FBT", "PLR2
 python-version = "3.13"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "E501", "INP001", "ANN", "ARG001"]
+"tests/*" = ["S101", "E501", "INP001", "ANN", "ARG001", "SLF001"]
+# CLI: progress goes to stdout; reuses server's private Discord helpers.
+"src/discord_mcp/sync.py" = ["T201", "SLF001"]
