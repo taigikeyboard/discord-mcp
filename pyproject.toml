@@ -22,7 +22,7 @@ build-backend = "uv_build"
 dev = [
     "pytest==9.2.0",
     "respx==0.23.1",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
     "ty==0.0.99",
 ]
 
